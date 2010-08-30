@@ -1,0 +1,23 @@
+Revision history for Perl extension Squid::Guard.
+
+0.08  Mon Aug 30 2010
+	- mkdb method for creating .db files
+0.07  Mon Aug 30 2010
+	- Added tests for urls and expressions
+	- Some code cleaning
+	- Some pod cleaning
+0.06  Fri Aug 27 2010
+	- Dont update .db files by default
+	- Some cleaning
+0.05  Thu Aug 24 2010
+	- Dont use URI anymore pfor url parsing: used it for canonicalizing urls, but squid is already giving cleaned urls
+0.04  Mon Aug 23 2010
+	- Name changed from Net::Squid::Guard to Squid::Guard
+0.03  Thu Aug 17 2010
+	- Added the 'CHECKF' special value for redir
+0.02  Mon Aug 16 2010
+	- automatic .db file (re)generation
+0.01  Fri Jul 23 21:46:07 2010
+	- original version; created by h2xs 1.23 with options
+		-AX --skip-exporter --use-new-tests -n Net::Squid::Guard
+
