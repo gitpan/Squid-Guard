@@ -5,8 +5,10 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME              => 'Squid::Guard',
     VERSION_FROM      => 'lib/Squid/Guard.pm', # finds $VERSION
-    PREREQ_PM         => {}, # e.g., Module::Name => 1.1
+    PREREQ_PM         => {
+	'DB_File'	=> '0', # or a minimum working version
+    }, # e.g., Module::Name => 1.1
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Squid/Guard.pm', # retrieve abstract from module
-       AUTHOR         => 'Luigi Iotti <luigi@iotti.biz>') : ()),
+       AUTHOR         => 'Luigi Iotti <cpan@iotti.biz>') : ()),
 );
