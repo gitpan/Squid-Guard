@@ -6,7 +6,7 @@ use warnings;
 
 our @ISA = qw();
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 use Carp;
 use DB_File;
@@ -366,7 +366,7 @@ sub mkdb {
 			if( $self->{forcedbupdate} || (stat($domsrc))[9] > ( (stat($domdb))[9] || 0 ) ) {
 				$self->{verbose} and print STDERR "Making $domdb\n";
 				my %h;
-				my $X = tie (%h, 'DB_File', $domdb, O_CREAT|O_TRUNC, 0644, $DB_BTREE) || croak ("Cannot create $domdb: $!");
+				my $X = tie (%h, 'DB_File', $domdb, O_CREAT|O_TRUNC|O_RDWR, 0644, $DB_BTREE) || croak ("Cannot create $domdb: $!");
 				open( F, "< $domsrc") or croak "Cannot open $domsrc";
 				while( <F> ) {
 					chomp;
@@ -389,7 +389,7 @@ sub mkdb {
 			if( $self->{forcedbupdate} || (stat($urlsrc))[9] > ( (stat($urldb))[9] || 0 ) ) {
 				$self->{verbose} and print STDERR "Making $urldb\n";
 				my %h;
-				my $X = tie (%h, 'DB_File', $urldb, O_CREAT|O_TRUNC, 0644, $DB_BTREE) || croak ("Cannot create $urldb: $!");
+				my $X = tie (%h, 'DB_File', $urldb, O_CREAT|O_TRUNC|O_RDWR, 0644, $DB_BTREE) || croak ("Cannot create $urldb: $!");
 				open( F, "< $urlsrc") or croak "Cannot open $urlsrc";
 				while( <F> ) {
 					chomp;

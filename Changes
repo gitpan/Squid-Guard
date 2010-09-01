@@ -1,9 +1,12 @@
 Revision history for Perl extension Squid::Guard.
 
+0.10  Wed Sep 01 2010
+	- tweaks to support freebsd based platforms
 0.09  Tue Aug 31 2010
 	- tweaks to be happy with CPAN Testers
 0.08  Mon Aug 30 2010
 	- mkdb method for creating .db files
+	- first release submitted to CPAN
 0.07  Mon Aug 30 2010
 	- Added tests for urls and expressions
 	- Some code cleaning
