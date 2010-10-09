@@ -1,5 +1,7 @@
 Revision history for Perl extension Squid::Guard.
 
+0.11  Sat Oct 09 2010
+	- support for key-value pairs in request
 0.10  Wed Sep 01 2010
 	- tweaks to support freebsd based platforms
 0.09  Tue Aug 31 2010

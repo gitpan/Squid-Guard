@@ -7,7 +7,7 @@ use Carp;
 
 our @ISA = qw();
 
-our $VERSION = '0.05';
+our $VERSION = '0.11';
 
 
 =head1 NAME
@@ -61,11 +61,11 @@ sub new {
 
 	{
 		no strict qw(vars refs);
-		local ($url, $foo, $ident, $method, $kvpairs, $addr, $fqdn, $_scheme, $authority, $path, $query, $fragment, $host, $_port);
-		($url, $foo, $ident, $method, $kvpairs) = split(/\s+/, $str);
+		local ($url, $foo, $ident, $method, $_kvpairs, $addr, $fqdn, $_scheme, $authority, $path, $query, $fragment, $host, $_port);
+		($url, $foo, $ident, $method, $_kvpairs) = split(/\s+/, $str, 5);
 		($addr, $fqdn) = split(/\//, $foo);
 
-		foreach ( qw( ident kvpairs fqdn ) ) {
+		foreach ( qw( ident _kvpairs fqdn ) ) {
 			${$_} = undef if ${$_} eq '-';
 		}
 
@@ -73,7 +73,7 @@ sub new {
 		($_scheme, $authority, $path, $query, $fragment) = $url =~ m|(?:([^:/?#]+)://)?([^/?#]*)([^?#]*)(?:\?([^#]*))?(?:#(.*))?|;	# Slightly modified for our usage: authority is needed, // isn't
 		($host, $_port) = split( /:/, $authority );
 
-		foreach ( qw( url ident method kvpairs addr fqdn _scheme authority path query fragment host _port ) ) {
+		foreach ( qw( url ident method _kvpairs addr fqdn _scheme authority path query fragment host _port ) ) {
 			$self->{$_} = ${$_};
 		}
 	}
@@ -120,7 +120,7 @@ sub new {
 
 =head2 $req->kvpairs()
 
-    Get request kvpairs
+    When called without arguments, returns a hash consisting of the extra key/value pairs found in the request. If an argument is supplied, it is taken as a key and the corresponding value (or undef) is returned. You can access the string of key/value pairs exactly as passed in the request by using _kvpairs instead
 
 =cut
 
@@ -145,7 +145,7 @@ sub AUTOLOAD {
 	if ($AUTOLOAD =~ /.*::(.*)/) {
 		my $element = $1;
 		return if $element eq "DESTROY";
-		if( grep { $element eq $_ } qw( url ident method kvpairs addr fqdn _scheme authority host _port path query fragment ) ) {
+		if( grep { $element eq $_ } qw( url ident method _kvpairs addr fqdn _scheme authority host _port path query fragment ) ) {
 			*$AUTOLOAD = sub { 
 				my $self = shift;
 				$self->{$element};
@@ -182,7 +182,14 @@ sub AUTOLOAD {
 					return undef;
 				}
 			 }
+		} elsif( $element eq 'kvpairs' ) {
+			*$AUTOLOAD = sub {
+				my $self = shift;
+				return undef unless $self->{'_kvpairs'};
+				$self->{_kvh} ||= { map { split(/=/, $_) } split(/\s+/, $self->{'_kvpairs'}) };
 
+				@_ ? $self->{_kvh}->{$_[0]} : %{$self->{_kvh}};
+			};
 		} else {
 			croak "invalid method $element";
 		}

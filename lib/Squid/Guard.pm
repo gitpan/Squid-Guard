@@ -6,7 +6,7 @@ use warnings;
 
 our @ISA = qw();
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use Carp;
 use DB_File;
@@ -671,7 +671,7 @@ __END__
 
 =head1 AUTHOR
 
-Luigi Iotti, E<lt>luigi@iotti.biz<gt>
+Luigi Iotti, E<lt>luigi@iotti.biz>
 
 =head1 COPYRIGHT AND LICENSE
 

@@ -6,7 +6,7 @@
 # Preliminary stuff
 use strict;
 
-use Test::More tests => 54;
+use Test::More tests => 58;
 BEGIN { use_ok('Squid::Guard::Request') };
 
 # Sanity checks
@@ -55,20 +55,24 @@ is($req->port,		551,			'request #38');
 is($req->path,		'/dir/file.pl',		'request #39');
 is($req->path_query,	'/dir/file.pl',		'request #40');
 is($req->authority_path_query,	'www.iotti.biz:551/dir/file.pl',	'request #41');
+is($req->kvpairs,	undef,			'request #42');
 
-$req = Squid::Guard::Request->new( 'www.iotti.biz:443 172.31.30.132/- user1 CONNECT -' );
+$req = Squid::Guard::Request->new( 'www.iotti.biz:443 172.31.30.132/- user1 CONNECT myip=172.16.0.38 myport=8080' );
 ok( defined $req );			# check that we got something
-is($req->url,		'www.iotti.biz:443',	'request #43');
-is($req->addr,		'172.31.30.132',	'request #44');
-is($req->ident,		'user1',		'request #45');
-is($req->method,	'CONNECT',		'request #46');
-is($req->_scheme,	undef,			'request #47');
-is($req->scheme,	'https',		'request #48');
-is($req->authority,	'www.iotti.biz:443',	'request #49');
-is($req->host,		'www.iotti.biz',	'request #50');
-is($req->_port,		443,			'request #51');
-is($req->port,		443,			'request #52');
-is($req->path_query,	'',			'request #53');
-is($req->authority_path_query,	'www.iotti.biz:443',	'request #54');
+is($req->url,		'www.iotti.biz:443',	'request #44');
+is($req->addr,		'172.31.30.132',	'request #45');
+is($req->ident,		'user1',		'request #46');
+is($req->method,	'CONNECT',		'request #47');
+is($req->_scheme,	undef,			'request #48');
+is($req->scheme,	'https',		'request #49');
+is($req->authority,	'www.iotti.biz:443',	'request #50');
+is($req->host,		'www.iotti.biz',	'request #51');
+is($req->_port,		443,			'request #52');
+is($req->port,		443,			'request #53');
+is($req->path_query,	'',			'request #54');
+is($req->authority_path_query,	'www.iotti.biz:443',	'request #55');
+is($req->_kvpairs,	'myip=172.16.0.38 myport=8080',	'request #56');
+is($req->kvpairs('myip'),	'172.16.0.38',	'request #57');
+is($req->kvpairs('myport'),	'8080',		'request #58');
 
 
