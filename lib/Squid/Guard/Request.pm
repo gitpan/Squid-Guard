@@ -1,13 +1,13 @@
 package Squid::Guard::Request;
 
-use 5.008008;
+use 5.008;
 use strict;
 use warnings;
 use Carp;
 
 our @ISA = qw();
 
-our $VERSION = '0.11';
+our $VERSION = '0.13';
 
 
 =head1 NAME
@@ -28,7 +28,7 @@ from Squid to the redirector.
 
 =head2 Squid::Guard::Request->new( $str )
 
-    API call to create a new object. The $str parameter should be in the format used by Squid to pass a request to the redirection program: C<url addr/fqdn user method kvpairs>.
+API call to create a new object. The $str parameter should be in the format used by Squid to pass a request to the redirection program: C<url addr/fqdn user method kvpairs>.
 
 =cut
 
@@ -85,54 +85,54 @@ sub new {
 
 =head2 $req->url()
 
-    Get request url
+Get request url
 
 =cut
 
 
 =head2 $req->addr()
 
-    Get request address
+Get request address
 
 =cut
 
 
 =head2 $req->fqdn()
 
-    Get request fqdn
+Get request fqdn
 
 =cut
 
 
 =head2 $req->ident()
 
-    Get request ident
+Get request ident
 
 =cut
 
 
 =head2 $req->method()
 
-    Get request method
+Get request method
 
 =cut
 
 
 =head2 $req->kvpairs()
 
-    When called without arguments, returns a hash consisting of the extra key/value pairs found in the request. If an argument is supplied, it is taken as a key and the corresponding value (or undef) is returned. You can access the string of key/value pairs exactly as passed in the request by using _kvpairs instead
+When called without arguments, returns a hash consisting of the extra key/value pairs found in the request. If an argument is supplied, it is taken as a key and the corresponding value (or undef) is returned. You can access the string of key/value pairs exactly as passed in the request by using _kvpairs instead
 
 =cut
 
 
 =head2 $req->_scheme() $req->scheme() $req->authority() $req->host() $req->_port() $req->port() $req->path() $req->query() $req->path_query() $req->authority_path_query() $req->fragment()
 
-    Get url components. These methods are inspired form the URI module.
+Get url components. These methods are inspired form the URI module.
 
-    If a port is not specified explicitly in the request, then $req->port returns the scheme's default port.
-    If you don't want the default port substituted, then you can use the $uri->_port method instead. (behaviour consistent with URI module)
-    Similarly, $req->_scheme reports the scheme explicitly specified in the requested url, or undef if not present (this is cthe case of CONNECT requests).
-    When $req->_scheme is undef and $uri->_port is defined, $req->scheme is set to the port's default scheme.
+If a port is not specified explicitly in the request, then $req->port returns the scheme's default port.
+If you don't want the default port substituted, then you can use the $uri->_port method instead. (behaviour consistent with URI module)
+Similarly, $req->_scheme reports the scheme explicitly specified in the requested url, or undef if not present (this is cthe case of CONNECT requests).
+When $req->_scheme is undef and $uri->_port is defined, $req->scheme is set to the port's default scheme.
 
 =cut
 

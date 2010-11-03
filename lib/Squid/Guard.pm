@@ -1,12 +1,12 @@
 package Squid::Guard;
 
-use 5.008008;
+use 5.008;
 use strict;
 use warnings;
 
 our @ISA = qw();
 
-our $VERSION = '0.11';
+our $VERSION = '0.13';
 
 use Carp;
 use DB_File;
@@ -45,7 +45,7 @@ squidGuard did not support this, so Squid::Guard was born.
 
 =head2 Squid::Guard->new( opt => val, ...)
 
-    API call to create a new server.  Does not actually start running anything until you call C<-E<gt>run()>.
+API call to create a new server.  Does not actually start running anything until you call C<-E<gt>run()>.
 
 =cut
 
@@ -58,6 +58,7 @@ sub new {
 	$self->{dbdir}          = undef;
 	$self->{forcedbupdate}  = 0;
 	$self->{checkf}         = undef;
+	$self->{concurrency}    = 0;
 	$self->{categ}          = {};
 	$self->{redir}          = ();
 	$self->{strictauth}     = 0;
@@ -76,8 +77,8 @@ sub new {
 
 =head2 $sg->redir()
 
-    Get/set the redir page.
-    The following macros are supported:
+Get/set the redir page.
+The following macros are supported:
 
 =over
 
@@ -97,7 +98,7 @@ sub new {
 
 =back
 
-    If set to the special value C<CHECKF>, then the return value of the checkf function, if true, is used directly as the redirection url
+If set to the special value C<CHECKF>, then the return value of the checkf function, if true, is used directly as the redirection url
 
 =cut
 
@@ -110,9 +111,9 @@ sub redir {
 
 =head2 $sg->checkf()
 
-    Sets the check callback function, which is called upn each request received.
-    The check function receives as arguments the current C<Squid::Guard> object, and a L<Squid::Guard::Request> object on which the user can perform tests.
-    A false return value means no redirection is to be proformed. A true return value means that the request is to be redirected to what was declared with C<redir()>.
+Sets the check callback function, which is called upn each request received.
+The check function receives as arguments the current C<Squid::Guard> object, and a L<Squid::Guard::Request> object on which the user can perform tests.
+A false return value means no redirection is to be proformed. A true return value means that the request is to be redirected to what was declared with C<redir()>.
 
 =cut
 
@@ -123,9 +124,23 @@ sub checkf {
 }
 
 
+=head2 $sg->concurrency()
+
+Enables the concurrency protocol. For now, the implementation is rather poor: the ID is simply read and echoed to squid.
+See url_rewrite_concurrency in squid.conf
+
+=cut
+
+sub concurrency {
+	my $self = shift;
+	my $num = shift;
+	$self->{concurrency} = $num;
+}
+
+
 =head2 $sg->verbose()
 
-    Get/set verbosity. Currently only one level of verbosity is supported
+Get/set verbosity. Currently only one level of verbosity is supported
 
 =cut
 
@@ -138,7 +153,7 @@ sub verbose {
 
 =head2 $sg->debug()
 
-    Emit debug info
+Emit debug info
 
 =cut
 
@@ -152,7 +167,7 @@ sub debug {
 
 =head2 $sg->oneshot()
 
-    Executes only a single iteration then exits (can be used when debugging)
+Executes only a single iteration then exits (can be used when debugging)
 
 =cut
 
@@ -165,9 +180,9 @@ sub oneshot {
 
 =head2 $sg->handle($req)
 
-    Handles a request, returning the empty string or the redirected url.
-    The request can be either a string in the format passed to the redirector by squid, or a Squid::Guard::Request object.
-    This sub is usually called internally by run() to handle a request, but can be called directly too.
+Handles a request, returning the empty string or the redirected url.
+The request can be either a string in the format passed to the redirector by squid, or a Squid::Guard::Request object.
+This sub is usually called internally by run() to handle a request, but can be called directly too.
 
 =cut
 
@@ -238,7 +253,7 @@ sub handle {
 
 =head2 $sg->run()
 
-    Starts handling the requests, reading them from <STDIN> one per line in the format used by Squid to talk to the url_rewrite_program
+Starts handling the requests, reading them from <STDIN> one per line in the format used by Squid to talk to the url_rewrite_program
 
 =cut
 
@@ -254,14 +269,20 @@ sub run {
 		chomp;
 		$self->{verbose} and print STDERR "Examining $_\n";
 
+		my $ret = "";
+		if( $self->{concurrency} ) {
+			s/^(\d+)\s+//o;
+			$ret = $1;
+		}
+
 		my $redir = $self->handle($_);
 
 		if( $redir ) {
 			$self->{verbose} and print STDERR "Returning $redir\n";
-			print "$redir\n";
-		} else {
-			print "\n";
+			$ret .= " $redir";
 		}
+
+		print "$ret\n";
 
 		last if $self->{oneshot};
 	}
@@ -273,10 +294,11 @@ sub run {
 Squid::Guard provides support for using precompiled black or white lists, in a way similar to what squidGuard does. These lists are organized in categories. Each category has its own path (a directory) where three files can reside. These files are named domains, urls and expressions. There's no need for all three to be there, and in most situations only the domains and urls files are used. These files list domains, urls and/or (regular) expressions which describe if a request belong to the category. You can decide, in the checkf function, to allow or to redirect a request belonging to a certain category.
 Similarly to what squidGuard does, the domains and urls files have to be compiled in .db form prior to be used. This makes it possible to run huge domains and urls lists, with acceptable performance.
 You can find precompiled lists on the net, or create your own.
+Beginning with version 0.13, there is EXPERIMENTAL support for the userdomains file. This file lists domains associated with users. The request will be checked against the domains only if the request has the associated identity corresponding to the user. The file is made of lines in the format C<user|domain>. At the moment, the file is entirely read in memory and no corresponding .db is generated/needed. The userdomain feature is EXPERIMENTAL and subject to change.
 
 =head2 $sg->dbdir()
 
-    Get/set dbdir parameter, i.e. the directory where category subdirs are found. .db files generated from domains and urls files will reside here too.
+Get/set dbdir parameter, i.e. the directory where category subdirs are found. .db files generated from domains and urls files will reside here too.
 
 =cut
 
@@ -289,8 +311,8 @@ sub dbdir {
 
 =head2 $sg->addcateg( name => path, ... )
 
-    Adds one or more categories.
-    C<path> is the directory, relative to dbdir, containing the C<domains>, C<urls> and C<expressions> files.
+Adds one or more categories.
+C<path> is the directory, relative to dbdir, containing the C<domains>, C<urls>, C<expressions> and C<userdomains> files.
 
 =cut
 
@@ -337,6 +359,19 @@ sub addcateg {
 			$self->{categ}->{$cat}->{e} = \@a;
 		}
 
+		my $ud = "$l/userdomains";
+		if( -f $ud ) {
+			my $hr = {};
+			open( UD, "< $ud" ) or croak "Cannot open $ud: $!";
+			while( <UD> ) {
+				chomp;
+				s/#.*//o;
+				next unless /^\s*([^\|]+)\|(.*\S)/o;
+				$hr->{$1}->{$2} = 1;
+			}
+			close UD;
+			$self->{categ}->{$cat}->{ud} = $hr;
+		}
 	}
 	return 1;
 }
@@ -344,9 +379,9 @@ sub addcateg {
 
 =head2 $sg->mkdb( name => path, ... )
 
-    Creates/updates the .db files for the categories.
-    Will search in C<path> for the potential presence of the C<domains> and C<urls> plaintext files.
-    According to the value of the C<forcedbupdate> flag (see), will create or update the .db file from them.
+Creates/updates the .db files for the categories.
+Will search in C<path> for the potential presence of the C<domains> and C<urls> plaintext files.
+According to the value of the C<forcedbupdate> flag (see), will create or update the .db file from them.
 
 =cut
 
@@ -411,9 +446,9 @@ sub mkdb {
 
 =head2 $sg->forcedbupdate()
 
-    Controls whether mkdb should forcibly update the .db files.
-    If set to a false value (which is the default), existing .db files are refreshed only if older than the respective plaintext file.
-    If set to a true value, .db files are always (re)created.
+Controls whether mkdb should forcibly update the .db files.
+If set to a false value (which is the default), existing .db files are refreshed only if older than the respective plaintext file.
+If set to a true value, .db files are always (re)created.
 
 =cut
 
@@ -489,7 +524,7 @@ sub _uris($) {
 
 =head2 $sg->checkincateg($req, $categ)
 
-    Checks if a request is in a category
+Checks if a request is in a category
 
 =cut
 
@@ -536,6 +571,18 @@ sub checkincateg($$$) {
 			}
 		}
 	}
+	if( $req->ident and defined( $catref->{$categ}->{ud}->{$req->ident} ) ) {
+		$self->{debug} and print STDERR " Check " . $req->host . " in $categ userdomains for user " . $req->ident . "\n";
+		my $hr = $catref->{$categ}->{ud}->{$req->ident};
+		# TODO: optimization: precompile _domains($req->host) only once for domains and userdomains
+		foreach( _domains($req->host) ) {
+			$self->{debug} and print STDERR "  Check $_\n";
+			if($hr->{$_}) {
+				$self->{debug} and print STDERR "   FOUND\n";
+				return 1;
+			}
+		}
+	}
 	return 0;
 }
 
@@ -545,7 +592,7 @@ sub checkincateg($$$) {
 
 =head2 $sg->checkingroup($user, $group)
 
-    Checks if a user is in a UNIX grop
+Checks if a user is in a UNIX grop
 
 =cut
 
@@ -605,7 +652,7 @@ sub checkingroup($$$) {
 
 =head2 $sg->checkinwbgroup($user, $group)
 
-    Checks if a user is in a WinBind grop
+Checks if a user is in a WinBind grop
 
 =cut
 
@@ -653,7 +700,7 @@ sub checkinwbgroup($$$) {
 
 =head2 $sg->checkinaddr($req)
 
-    Checks if a request is for an explicit IP address
+Checks if a request is for an explicit IP address
 
 =cut
 

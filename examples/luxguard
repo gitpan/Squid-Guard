@@ -17,6 +17,9 @@ use strict;
 # Note the substitution patterns %a, %n etc.
 my $redir = "http://proxy/cgi-bin/denymessage?clientaddr=%a&clientname=%n&clientident=%i&url=%u&block=%t&path=%p";
 
+# Set to something true concurrency protocol. See url_rewrite_concurrency in squid.conf
+my $concurrency = 0;
+
 # Always allowed to surf the net
 my @servers = (
         '127.0.0.1',
@@ -90,5 +93,6 @@ if( $opts{C} ) {
 } else {
 	$lg->addcateg(%categ);
 	$lg->checkf(\&check);
+	$concurrency && $lg->concurrency($concurrency);
 	$lg->run();
 }

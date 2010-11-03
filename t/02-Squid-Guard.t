@@ -11,8 +11,9 @@ use File::Copy;
 copy("t/domains","$tempdir") or die "Copy failed: $!";
 copy("t/urls","$tempdir") or die "Copy failed: $!";
 copy("t/expressions","$tempdir") or die "Copy failed: $!";
+copy("t/userdomains","$tempdir") or die "Copy failed: $!";
 
-use Test::More tests => 14;
+use Test::More tests => 20;
 BEGIN { use_ok('Squid::Guard') };
 
 # Sanity checks
@@ -47,6 +48,12 @@ is($lg->handle(   "http://www.youZorn.com/ 172.31.30.132/- user2 GET -" ), '', '
 like($lg->handle( "http://looki.de/user/pippo 172.31.30.132/- user2 GET -" ), qr/denymessage.*blacklist/, 'blacklist urls #1');
 like($lg->handle( "http://tvithai.com/boondee/pippo 172.31.30.132/- user2 GET -" ), qr/denymessage.*blacklist/, 'blacklist urls #2');
 like($lg->handle( "http://172.16.5.100/foo 172.31.30.132/- user2 GET -" ), qr/denymessage.*blacklist/, 'blacklist expressions #1');
+like($lg->handle( "http://www.foodom.com/ 172.31.30.132/- foouser GET -" ), qr/denymessage.*blacklist/, 'blacklist userdomains #1');
+like($lg->handle( "http://www.bardom.com/ 172.31.30.132/- baruser GET -" ), qr/denymessage.*blacklist/, 'blacklist userdomains #2');
+is($lg->handle(   "http://www.foodom.com/ 172.31.30.132/- baruser GET -" ), '', 'blacklist userdomains #3');
+is($lg->handle(   "http://www.foodom.com/ 172.31.30.132/- nonexistinguser GET -" ), '', 'blacklist userdomains #4');
+is($lg->handle(   "http://www.foodom.com/ 172.31.30.132/- - GET -" ), '', 'blacklist userdomains #5');
+is($lg->handle(   "http://www.nonexistingdom.com/ 172.31.30.132/- foouser GET -" ), '', 'blacklist userdomains #6');
 
 like($lg->handle( "www.youporn.com:443 172.31.30.132/- user2 CONNECT -" ), qr/denymessage.*blacklist/, 'blacklist connect method #1');
 is($lg->handle(   "www.youZorn.com:443 172.31.30.132/- user2 CONNECT -" ), '', 'blacklist connect method #2');

@@ -1,5 +1,10 @@
 Revision history for Perl extension Squid::Guard.
 
+0.13  Tue Nov 02 2010
+	- added experimental userdomains file support
+	- initial minimal support for concurrency protocol
+0.12  Mon Oct 11 2010
+	- minor documentation cleaning
 0.11  Sat Oct 09 2010
 	- support for key-value pairs in request
 0.10  Wed Sep 01 2010
