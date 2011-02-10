@@ -20,6 +20,9 @@ my $redir = "http://proxy/cgi-bin/denymessage?clientaddr=%a&clientname=%n&client
 # Set to something true concurrency protocol. See url_rewrite_concurrency in squid.conf
 my $concurrency = 0;
 
+# Set to a positive value to cache checkingroup and checkinwbgroup calls
+my $cache = 0;
+
 # Always allowed to surf the net
 my @servers = (
         '127.0.0.1',
@@ -49,7 +52,7 @@ sub check($$) {
 	return 0 if $lg->checkingroup( $req->{ident}, "root"); # Administrators are always allowed
 	
 	# uncomment if you use Winbind
-	#return 0 if $lg->checkinwbgroup( $req->{ident}, "Domain Admins");
+	#return 0 if $lg->checkinwbgroup( $req->{ident}, "Domain Admins", "internet" );
 
 	# uncomment if you want open internet access in off-work hours
 	#my ($min,$hour,$wday) = (localtime(time))[1,2,6];	# some tests based on date/time
@@ -62,9 +65,7 @@ sub check($$) {
 	return 0 if $lg->checkincateg( $req, 'whitelist');		# Local WL
 	return 'in-addr' if $lg->checkinaddr($req);	# Explicit IPs are not allowed here
 
-	for( qw/porn socialnet/ ) {
-		return $_ if $lg->checkincateg( $req, $_);
-	}
+	return $lg->checkincateg( $req, qw/porn socialnet/ );
 
 	0;
 }
@@ -94,5 +95,6 @@ if( $opts{C} ) {
 	$lg->addcateg(%categ);
 	$lg->checkf(\&check);
 	$concurrency && $lg->concurrency($concurrency);
+	$cache && $lg->cache($cache);
 	$lg->run();
 }

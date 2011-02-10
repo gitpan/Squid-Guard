@@ -6,7 +6,7 @@ use warnings;
 
 our @ISA = qw();
 
-our $VERSION = '0.13';
+our $VERSION = '0.15';
 
 use Carp;
 use DB_File;
@@ -138,6 +138,72 @@ sub concurrency {
 }
 
 
+my $cachettl = 0;
+my $cachepurgelastrun = 0;
+my %cacheh;	# this contains the real cache items
+my @cachea;	# this contains the cache keys with the time they where written in the cache.
+
+=head2 $sg->cache()
+
+Enables caching in expensive subs which involve spawning external processes. At the moment, caching is implemented in C<checkinwbgroup()> (which calls wbinfo 3 times) and in C<checkingroup()> (which can be expensive in some nss configurations).
+An argument must be suplied, representing the time to live of cached items, in seconds.
+The time to live, as the whole cached objects, are shared among all the objects belonging to this class. No problem since usually only one object is in use.
+
+=cut
+
+sub cache {
+	my $self = shift;
+	my $ttl = shift;
+	$cachettl = $ttl;
+}
+
+
+sub _cachepurge() {
+	my $time = time();
+	return if $cachepurgelastrun == $time;	# do not purge too often
+	$cachepurgelastrun = $time;
+
+        my $t = $time - $cachettl;
+
+	return unless @cachea;			# try to avoid looping through if unnecessary
+	return if $cachea[0]->[0] > $t;
+
+	my $ndel = 0;
+        LOOP: foreach my $p ( @cachea ) {
+                last LOOP if $p->[0] > $t;
+
+                my $k = $p->[1];
+                delete( $cacheh{$k} ) if defined( $cacheh{$k} ) && $cacheh{$k}->[0] <= $t;
+
+		$ndel++;
+        }
+	
+	$ndel and splice(@cachea, 0, $ndel);
+}
+
+
+sub _cachewr($$) {
+        my ($k, $v) = @_;
+	defined($v) or $v = "";	# be sure not to cache undef values since _cacherd returns undef when the value is not in the cache
+
+        my $t = time;
+
+        my @arr = ( $t, $v );
+        $cacheh{$k} = \@arr;
+
+        my @arra = ($t, $k);
+        push @cachea, \@arra;
+}
+
+
+sub _cacherd($) {
+        my ($k) = @_;
+	# Purge the cache when reading from it. This also ensures that the remaining cache record are in their ttl. This could be done in other occasions too
+	_cachepurge();
+        return defined($cacheh{$k}) ? $cacheh{$k}->[1] : undef;
+}
+
+
 =head2 $sg->verbose()
 
 Get/set verbosity. Currently only one level of verbosity is supported
@@ -204,13 +270,17 @@ sub handle {
 			$redir = $self->{redir} || croak "A request was submitted, but redir url is not defined";
 			$redir =~ s/(?<!%)%a/$req->addr/ge;
 			$redir =~ s/(?<!%)%n/$req->fqdn or "unknown"/ge;
-			$redir =~ s/(?<!%)%i/$req->ident or "unknown"/ge;
+			my $i = $req->ident || "unknown";
+			$i =~ s/([^-._A-Za-z0-9])/sprintf("%%%02X", ord($1))/eg;
+			$redir =~ s/(?<!%)%i/$i/g;
 			#$redir =~ s/(?<!%)%s//;	# Contrary to squidGuard, it does not mean anything to us
 			$redir =~ s/(?<!%)%u/$req->url/ge;
 			my $pq = $req->path_query;
 			$pq =~ s-^/--o;
 			$redir =~ s/(?<!%)%p/$pq/g;
-			$redir =~ s/(?<!%)%t/$res/ge;
+			my $r = $res;
+			$r =~ s/([^-._A-Za-z0-9])/sprintf("%%%02X", ord($1))/eg;
+			$redir =~ s/(?<!%)%t/$r/g;
 			$redir =~ s/%%/%/;
 
 # Redirections seem not to be understood when the request was for HTTPS.
@@ -271,7 +341,7 @@ sub run {
 
 		my $ret = "";
 		if( $self->{concurrency} ) {
-			s/^(\d+)\s+//o;
+			s/^(\d+\s+)//o;
 			$ret = $1;
 		}
 
@@ -279,7 +349,7 @@ sub run {
 
 		if( $redir ) {
 			$self->{verbose} and print STDERR "Returning $redir\n";
-			$ret .= " $redir";
+			$ret .= $redir;
 		}
 
 		print "$ret\n";
@@ -522,179 +592,250 @@ sub _uris($) {
 }
 
 
-=head2 $sg->checkincateg($req, $categ)
+=head2 $sg->checkincateg($req, $categ, ... )
 
-Checks if a request is in a category
+Checks if a request is in one category or more
 
 =cut
 
-sub checkincateg($$$) {
-	my ( $self, $req, $categ ) = @_;
+sub checkincateg($$@) {
+	my ( $self, $req, @categs ) = @_;
 
-	my $catref = $self->{categ};
-	defined( $catref->{$categ} ) or croak "The requested category $categ does not exist";
+	foreach my $categ (@categs) {
+		my $catref = $self->{categ};
+		defined( $catref->{$categ} ) or croak "The requested category $categ does not exist";
 
-	#print STDERR "s $req->scheme h $req->host p $req->path\n";
-	if( defined( $catref->{$categ}->{d} ) ) {
-		$self->{debug} and print STDERR " Check " . $req->host . " in $categ domains\n";
-		my $ref = $catref->{$categ}->{d};
-		foreach( _domains($req->host) ) {
-			$self->{debug} and print STDERR "  Check $_\n";
-			if(exists($ref->{$_})) {
-				$self->{debug} and print STDERR "   FOUND\n";
-				return 1;
+		#print STDERR "s $req->scheme h $req->host p $req->path\n";
+		if( defined( $catref->{$categ}->{d} ) ) {
+			$self->{debug} and print STDERR " Check " . $req->host . " in $categ domains\n";
+			my $ref = $catref->{$categ}->{d};
+			foreach( _domains($req->host) ) {
+				$self->{debug} and print STDERR "  Check $_\n";
+				if(exists($ref->{$_})) {
+					$self->{debug} and print STDERR "   FOUND\n";
+					return $categ;
+				}
+			}
+		}
+		if( defined( $catref->{$categ}->{u} ) ) {
+			# in url checking, we test the authority part + the optional path part + the optional query part
+			my $what = $req->authority_path_query;
+			$self->{debug} and print STDERR " Check $what in $categ urls\n";
+			my $ref = $catref->{$categ}->{u};
+			foreach( _uris($what) ) {
+				$self->{debug} and print STDERR "  Check $_\n";
+				if(exists($ref->{$_})) {
+					$self->{debug} and print STDERR "   FOUND\n";
+					return $categ;
+				}
+			}
+		}
+		if( defined( $catref->{$categ}->{e} ) ) {
+			my $what = $req->url;
+			$self->{debug} and print STDERR " Check $what in $categ expressions\n";
+			my $ref = $catref->{$categ}->{e};
+			foreach( @$ref ) {
+				$self->{debug} and print STDERR "  Check $_\n";
+				if( $what =~ /$_/i ) {	# Can't use 'o' regexp option, since I would compare always the same regexp.
+					$self->{debug} and print STDERR "   FOUND\n";
+					return $categ;
+				}
+			}
+		}
+		if( $req->ident and defined( $catref->{$categ}->{ud}->{$req->ident} ) ) {
+			$self->{debug} and print STDERR " Check " . $req->host . " in $categ userdomains for user " . $req->ident . "\n";
+			my $hr = $catref->{$categ}->{ud}->{$req->ident};
+			# TODO: optimization: precompile _domains($req->host) only once for domains and userdomains
+			foreach( _domains($req->host) ) {
+				$self->{debug} and print STDERR "  Check $_\n";
+				if($hr->{$_}) {
+					$self->{debug} and print STDERR "   FOUND\n";
+					return $categ;
+				}
 			}
 		}
 	}
-	if( defined( $catref->{$categ}->{u} ) ) {
-		# in url checking, we test the authority part + the optional path part + the optional query part
-		my $what = $req->authority_path_query;
-		$self->{debug} and print STDERR " Check $what in $categ urls\n";
-		my $ref = $catref->{$categ}->{u};
-		foreach( _uris($what) ) {
-			$self->{debug} and print STDERR "  Check $_\n";
-			if(exists($ref->{$_})) {
-				$self->{debug} and print STDERR "   FOUND\n";
-				return 1;
-			}
-		}
+
+	return '';
+}
+
+
+# Gets a passwd row, making use of the cache if enabled.
+
+sub _getpwnamcache($) {
+	my $nam = shift;
+	my $k = "PWNAM: $nam";
+
+	if( $cachettl ) {
+		my $v = _cacherd( $k );
+		defined($v) and return split( /:/, $v );
 	}
-	if( defined( $catref->{$categ}->{e} ) ) {
-		my $what = $req->url;
-		$self->{debug} and print STDERR " Check $what in $categ expressions\n";
-		my $ref = $catref->{$categ}->{e};
-		foreach( @$ref ) {
-			$self->{debug} and print STDERR "  Check $_\n";
-			if( $what =~ /$_/i ) {	# Can't use 'o' regexp option, since I would compare always the same regexp.
-				$self->{debug} and print STDERR "   FOUND\n";
-				return 1;
-			}
-		}
+
+	my @a = getpwnam($nam);
+
+	if( $cachettl ) {
+		_cachewr( $k, join( ':', @a ) );
 	}
-	if( $req->ident and defined( $catref->{$categ}->{ud}->{$req->ident} ) ) {
-		$self->{debug} and print STDERR " Check " . $req->host . " in $categ userdomains for user " . $req->ident . "\n";
-		my $hr = $catref->{$categ}->{ud}->{$req->ident};
-		# TODO: optimization: precompile _domains($req->host) only once for domains and userdomains
-		foreach( _domains($req->host) ) {
-			$self->{debug} and print STDERR "  Check $_\n";
-			if($hr->{$_}) {
-				$self->{debug} and print STDERR "   FOUND\n";
-				return 1;
-			}
-		}
+
+	return @a;
+}
+
+
+sub _getgrnamcache($) {
+	my $nam = shift;
+	my $k = "GRNAM: $nam";
+
+	if( $cachettl ) {
+		my $v = _cacherd( $k );
+		defined($v) and return split( /:/, $v );
 	}
-	return 0;
+
+	my @a = getgrnam($nam);
+
+	if( $cachettl ) {
+		_cachewr( $k, join( ':', @a ) );
+	}
+
+	return @a;
+}
+
+
+# Runs a command, making use of the cache if enabled.
+
+sub _runcache($) {
+	my $cmd = shift;
+	my $k = "RUN: $cmd";
+
+	my $v;
+	if( $cachettl ) {
+		$v = _cacherd( $k );
+		defined($v) and return $v;
+	}
+
+	$v = `$cmd`;
+
+	if( $cachettl ) {
+		_cachewr( $k, $v );
+	}
+
+	return $v;
 }
 
 
 =head2 Other help subs that can be used in the checkf function
 
 
-=head2 $sg->checkingroup($user, $group)
+=head2 $sg->checkingroup($user, $group, ... )
 
 Checks if a user is in a UNIX grop
 
 =cut
 
-sub checkingroup($$$) {
-	my ( $self, $user, $group ) = @_;
+sub checkingroup($$@) {
+	my ( $self, $user, @groups ) = @_;
 
 	return 0 unless $user;
 
-	my @pwent = getpwnam($user);
+	my @pwent = _getpwnamcache($user);
 	if( ! @pwent ) {
 		print STDERR "Can not find user $user\n";
-		return 0;
+		return '';
 	}
 
 	my $uid      = $pwent[2];
 	my $uprimgid = $pwent[3];
 	if( ! defined $uid || ! defined $uprimgid ) {
 		print STDERR "Can not find uid and gid corresponding to $user\n";
-		return 0;
+		return '';
 	}
 
-	my @grent = getgrnam($group);
-	if( ! @grent ) {
-		print STDERR "Can not find group $group\n";
-		return 0;
-	}
-
-	my $gid = $grent[2];
-	if( ! defined $gid ) {
-		print STDERR "Can not find gid corresponding to $group\n";
-		return 0;
-	}
-
-	if( $uprimgid == $gid ) {
-		$self->{debug} and print STDERR "FOUND $user has primary group $group\n";
-		return 1;
-	}
-
-	my @membri = split(/\s+/, $grent[3]);
-	$self->{debug} and print STDERR "Group $group contains:\n" . join("\n", @membri) . "\n";
-	for(@membri) {
-		my @pwent2 = getpwnam($_);
-		my $uid2 = $pwent2[2];
-		if( ! defined $uid2 ) {
-			print STDERR "Can not find uid corresponding to $_\n";
+	foreach my $group (@groups) {
+		my @grent = _getgrnamcache($group);
+		if( ! @grent ) {
+			print STDERR "Can not find group $group\n";
 			next;
 		}
-		if( $uid2 == $uid ) {
-			$self->{debug} and print STDERR "FOUND $user is in $group\n";
-			return 1;
+
+		my $gid = $grent[2];
+		if( ! defined $gid ) {
+			print STDERR "Can not find gid corresponding to $group\n";
+			next;
+		}
+
+		if( $uprimgid == $gid ) {
+			$self->{debug} and print STDERR "FOUND $user has primary group $group\n";
+			return $group;
+		}
+
+		my @membri = split(/\s+/, $grent[3]);
+		$self->{debug} and print STDERR "Group $group contains:\n" . join("\n", @membri) . "\n";
+		for(@membri) {
+			my @pwent2 = _getpwnamcache($_);
+			my $uid2 = $pwent2[2];
+			if( ! defined $uid2 ) {
+				print STDERR "Can not find uid corresponding to $_\n";
+				next;
+			}
+			if( $uid2 == $uid ) {
+				$self->{debug} and print STDERR "FOUND $user is in $group\n";
+				return $group;
+			}
 		}
 	}
 
-	return 0;
+	return '';
 }
 
 
-=head2 $sg->checkinwbgroup($user, $group)
+=head2 $sg->checkinwbgroup($user, $group, ...)
 
 Checks if a user is in a WinBind grop
 
 =cut
 
-sub checkinwbgroup($$$) {
-	my ( $self, $user, $group ) = @_;
+sub checkinwbgroup($$@) {
+	my ( $self, $user, @groups ) = @_;
 
-	return 0 unless $user;
+	return '' unless $user;
 
-	my $userSID = `wbinfo -n "$user"`;
+	my $userSID = _runcache("wbinfo -n '$user'");
 	if( $? ) {
 		print STDERR "Can not find user $user in winbind\n";
-		return 0;
+		return '';
 	}
 	$userSID =~ s/\s.*//o;
 	chomp $userSID;
 	$self->{debug} and print STDERR "Found user $user with SID $userSID\n";
 
-	my $groupSID = `wbinfo -n "$group"`;
-	if( $? ) {
-		print STDERR "Can not find group $group in winbind\n";
-		return 0;
+	my %groupsSIDs;
+	foreach my $group (@groups) {
+		my $groupSID = _runcache("wbinfo -n '$group'");
+		if( $? ) {
+			print STDERR "Can not find group $group in winbind\n";
+			return '';
+		}
+		$groupSID =~ s/\s.*//o;
+		chomp $groupSID;
+		$self->{debug} and print STDERR "Found group $group with SID $groupSID\n";
+		$groupsSIDs{$groupSID} = $group;
 	}
-	$groupSID =~ s/\s.*//o;
-	chomp $groupSID;
-	$self->{debug} and print STDERR "Found group $group with SID $groupSID\n";
 
-	my @groupsSIDs = `wbinfo --user-domgroups "$userSID"`;
+	my @userInSIDs = _runcache("wbinfo --user-domgroups '$userSID'");
 	if( $? ) {
 		print STDERR "Can not find the SIDs of the groups of $user - $userSID\n";
-		return 0;
+		return '';
 	}
-	$self->{debug} and print STDERR "$user is in the following groups:\n @groupsSIDs";
+	$self->{debug} and print STDERR "$user is in the following groups:\n @userInSIDs";
 
-	foreach ( @groupsSIDs ) {
+	foreach ( @userInSIDs ) {
 		chomp;
-		if ( $_ eq $groupSID ) {
+		if ( $groupsSIDs{$_} ) {
 			$self->{debug} and print STDERR "   FOUND\n";
-			return 1;
+			return $groupsSIDs{$_};
 		}
 	}
 
-	return 0;
+	return '';
 }
 
 
@@ -718,7 +859,7 @@ __END__
 
 =head1 AUTHOR
 
-Luigi Iotti, E<lt>luigi@iotti.biz>
+Luigi Iotti, E<lt>luigi@iotti.bizE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 

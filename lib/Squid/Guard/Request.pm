@@ -7,7 +7,7 @@ use Carp;
 
 our @ISA = qw();
 
-our $VERSION = '0.13';
+our $VERSION = '0.15';
 
 
 =head1 NAME
@@ -63,6 +63,9 @@ sub new {
 		no strict qw(vars refs);
 		local ($url, $foo, $ident, $method, $_kvpairs, $addr, $fqdn, $_scheme, $authority, $path, $query, $fragment, $host, $_port);
 		($url, $foo, $ident, $method, $_kvpairs) = split(/\s+/, $str, 5);
+
+		$ident =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/eg;
+
 		($addr, $fqdn) = split(/\//, $foo);
 
 		foreach ( qw( ident _kvpairs fqdn ) ) {

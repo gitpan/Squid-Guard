@@ -1,4 +1,4 @@
-Squid-Guard version 0.13
+Squid-Guard version 0.15
 ============================
 
 Squid::Guard is a module for creating a simple yet flexible
@@ -67,8 +67,8 @@ This module requires these other modules and libraries:
 
 TODO
 
-. Mysql or LDAP queries for determining user griup belongings
-. Add-d and -h in the luxguard example script
+. Mysql or LDAP queries for determining user gruop belongings
+. Add -d and -h in the luxguard example script
 . prepend debug messages with "FATAL: " "ERROR: " "WARNING: "
 . support threads with concurrency protocol
 . update documentation to correct usage of the term "redirect"

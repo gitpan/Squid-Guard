@@ -1,5 +1,13 @@
 Revision history for Perl extension Squid::Guard.
 
+0.15  Fri Feb 04 2011
+	- implemented a cache for expensive checkin*group calls
+	- decode escape sequences in username in request
+	- encode returned url parameters
+0.14  Thu Jan 20 2011
+	- do not return a leading space when concurrency is disabled
+	- checkincateg can check multiple categories
+	- checkin*group can check multiple groups
 0.13  Tue Nov 02 2010
 	- added experimental userdomains file support
 	- initial minimal support for concurrency protocol
